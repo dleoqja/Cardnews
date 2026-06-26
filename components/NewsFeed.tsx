@@ -92,7 +92,7 @@ export function NewsFeed() {
           void loadMore();
         }
       },
-      { root: scrollerRef.current, rootMargin: "600px" },
+      { root: scrollerRef.current, rootMargin: "120%" },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -180,6 +180,7 @@ export function NewsFeed() {
       <div
         ref={scrollerRef}
         className="h-full w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ overflowAnchor: "none" }}
       >
         {items.length === 0 && loading
           ? Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)
