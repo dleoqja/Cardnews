@@ -17,7 +17,6 @@ export function NewsFeed() {
   const { theme, toggle } = useTheme();
 
   const [items, setItems] = useState<NewsArticle[]>([]);
-  const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [category, setCategory] = useState<NewsCategory>("전체");
@@ -27,6 +26,8 @@ export function NewsFeed() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
+  const pageRef = useRef(0);
+  const hasMoreRef = useRef(true);
   const dwellTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -34,31 +35,41 @@ export function NewsFeed() {
   const loadMore = useCallback(
     async (reset = false) => {
       if (loadingRef.current) return;
+      if (!hasMoreRef.current && !reset) return;
       loadingRef.current = true;
       setLoading(true);
-      const nextPage = reset ? 0 : page;
+      const nextPage = reset ? 0 : pageRef.current;
       const { items: newItems, hasMore: more } = await fetchNewsPage(
         nextPage,
         category,
       );
+      pageRef.current = nextPage + 1;
+      hasMoreRef.current = more;
       setItems((prev) => (reset ? newItems : [...prev, ...newItems]));
       setHasMore(more);
-      setPage(nextPage + 1);
       setLoading(false);
       loadingRef.current = false;
+      // sentinel이 여전히 뷰포트 안에 있으면 다음 페이지를 즉시 로드
+      if (more && sentinelRef.current && scrollerRef.current) {
+        const sentinel = sentinelRef.current.getBoundingClientRect();
+        const container = scrollerRef.current.getBoundingClientRect();
+        if (sentinel.top <= container.bottom + 600) {
+          void loadMore();
+        }
+      }
     },
-    [page, category],
+    [category],
   );
 
   // Initial + category change load
   useEffect(() => {
+    pageRef.current = 0;
+    hasMoreRef.current = true;
     setItems([]);
-    setPage(0);
     setHasMore(true);
     if (scrollerRef.current) scrollerRef.current.scrollTo({ top: 0 });
     void loadMore(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+  }, [category, loadMore]);
 
   // Deep link: /?id=123 opens detail
   useEffect(() => {
@@ -77,7 +88,7 @@ export function NewsFeed() {
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+        if (entries[0].isIntersecting && !loadingRef.current) {
           void loadMore();
         }
       },
@@ -85,7 +96,7 @@ export function NewsFeed() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [hasMore, loadMore]);
+  }, [loadMore]);
 
   // Mark read after dwelling on a card
   const handleCardRef = useCallback(
