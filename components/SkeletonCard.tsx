@@ -1,6 +1,6 @@
 export function SkeletonCard() {
   return (
-    <section className="relative flex h-[100svh] w-full snap-start flex-col justify-end overflow-hidden bg-surface-dark">
+    <section className="relative flex h-[100svh] w-full snap-start snap-always flex-col justify-end overflow-hidden bg-surface-dark">
       <div className="absolute inset-0 bg-gradient-to-b from-surface-dark via-ink/80 to-ink" />
       <Shimmer className="absolute inset-0" />
 

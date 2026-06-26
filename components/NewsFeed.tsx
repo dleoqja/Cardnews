@@ -195,9 +195,9 @@ export function NewsFeed() {
               </div>
             ))}
 
-        {/* Infinite-scroll sentinel + loader */}
-        {hasMore && items.length > 0 && <SkeletonCard />}
+        {/* Sentinel은 SkeletonCard 앞에 배치해 마지막 카드 도달 시 미리 로딩 시작 */}
         <div ref={sentinelRef} className="h-1 w-full" />
+        {hasMore && items.length > 0 && <SkeletonCard />}
 
         {!hasMore && items.length > 0 && (
           <div className="grid h-[100svh] w-full snap-start place-items-center bg-ink px-8 text-center">
