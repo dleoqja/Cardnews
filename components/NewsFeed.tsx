@@ -24,10 +24,13 @@ export function NewsFeed() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
   const pageRef = useRef(0);
   const hasMoreRef = useRef(true);
+  // 렌더마다 최신 items 길이를 스크롤 핸들러에서 참조하기 위한 ref
+  const itemsLengthRef = useRef(0);
+  itemsLengthRef.current = items.length;
+
   const dwellTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -38,24 +41,20 @@ export function NewsFeed() {
       if (!hasMoreRef.current && !reset) return;
       loadingRef.current = true;
       setLoading(true);
-      const nextPage = reset ? 0 : pageRef.current;
-      const { items: newItems, hasMore: more } = await fetchNewsPage(
-        nextPage,
-        category,
-      );
-      pageRef.current = nextPage + 1;
-      hasMoreRef.current = more;
-      setItems((prev) => (reset ? newItems : [...prev, ...newItems]));
-      setHasMore(more);
-      setLoading(false);
-      loadingRef.current = false;
-      // sentinel이 여전히 뷰포트 안에 있으면 다음 페이지를 즉시 로드
-      if (more && sentinelRef.current && scrollerRef.current) {
-        const sentinel = sentinelRef.current.getBoundingClientRect();
-        const container = scrollerRef.current.getBoundingClientRect();
-        if (sentinel.top <= container.bottom + 600) {
-          void loadMore();
-        }
+      try {
+        const nextPage = reset ? 0 : pageRef.current;
+        const { items: newItems, hasMore: more } = await fetchNewsPage(
+          nextPage,
+          category,
+        );
+        pageRef.current = nextPage + 1;
+        hasMoreRef.current = more;
+        setItems((prev) => (reset ? newItems : [...prev, ...newItems]));
+        setHasMore(more);
+      } finally {
+        // 에러가 발생해도 로딩 상태를 반드시 해제
+        setLoading(false);
+        loadingRef.current = false;
       }
     },
     [category],
@@ -82,20 +81,27 @@ export function NewsFeed() {
     }
   }, []);
 
-  // Infinite scroll
+  // 스크롤 이벤트 기반 무한 스크롤
+  // snap-y 환경에서 IntersectionObserver는 iOS Safari에서 snap 애니메이션 후
+  // intersection 상태 변화를 놓치는 경우가 있어 신뢰도가 낮음.
+  // 각 카드가 정확히 100svh이므로 scrollTop/cardHeight로 현재 인덱스를 정확히 계산 가능.
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !loadingRef.current) {
-          void loadMore();
-        }
-      },
-      { root: scrollerRef.current, rootMargin: "120%" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    const onScroll = () => {
+      if (loadingRef.current || !hasMoreRef.current) return;
+      const cardHeight = scroller.clientHeight;
+      if (cardHeight === 0) return;
+      const currentIndex = Math.round(scroller.scrollTop / cardHeight);
+      // 마지막 카드 3개 전부터 다음 페이지 선제 로딩
+      if (currentIndex >= itemsLengthRef.current - 3) {
+        void loadMore();
+      }
+    };
+
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
   }, [loadMore]);
 
   // Mark read after dwelling on a card
@@ -196,8 +202,6 @@ export function NewsFeed() {
               </div>
             ))}
 
-        {/* Sentinel은 SkeletonCard 앞에 배치해 마지막 카드 도달 시 미리 로딩 시작 */}
-        <div ref={sentinelRef} className="h-1 w-full" />
         {hasMore && items.length > 0 && <SkeletonCard />}
 
         {!hasMore && items.length > 0 && (

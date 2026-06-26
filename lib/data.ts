@@ -179,7 +179,8 @@ export const NEWS: NewsArticle[] = [
   },
 ];
 
-const PAGE_SIZE = 6;
+// API route와 동일하게 8로 맞춤 — 불일치 시 API 실패 후 fallback 페이지네이션이 어긋남
+const PAGE_SIZE = 8;
 
 /**
  * In-memory cache of every article the client has seen this session, keyed by

@@ -187,12 +187,20 @@ export async function GET(request: Request) {
 
   // Signal to the client that live data was unavailable so it can fall back.
   if (all.length === 0) {
-    return NextResponse.json({ items: [], hasMore: false, empty: true });
+    return NextResponse.json(
+      { items: [], hasMore: false, empty: true },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const start = page * PAGE_SIZE;
   const items = all.slice(start, start + PAGE_SIZE);
   const hasMore = start + PAGE_SIZE < all.length;
 
-  return NextResponse.json({ items, hasMore, empty: false });
+  // Vercel CDN에서 10분간 캐싱 — 동일 카테고리+페이지 요청이 같은 데이터를 반환하도록
+  // 보장해 멀티 인스턴스 환경에서의 페이지네이션 불일치를 방지
+  return NextResponse.json(
+    { items, hasMore, empty: false },
+    { headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=60" } },
+  );
 }
